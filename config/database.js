@@ -2,8 +2,8 @@ const fs = require("fs");
 
 module.exports = {
     development: {
-        username: "admin",
-        password: "admin@123mariadb",
+        username: "root",
+        password: "",
         database: "nettruyen_dev",
         host: "127.0.0.1",
         port: 3306,

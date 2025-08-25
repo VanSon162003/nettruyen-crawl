@@ -1,8 +1,8 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
-    const Genre = sequelize.define(
-        "Genre",
+    const Author = sequelize.define(
+        "Author",
         {
             id: {
                 type: DataTypes.INTEGER,
@@ -11,24 +11,28 @@ module.exports = (sequelize) => {
                 allowNull: false,
             },
             name: {
-                type: DataTypes.STRING(100),
+                type: DataTypes.STRING(255),
                 allowNull: false,
+            },
+            slug: {
+                type: DataTypes.STRING(255),
+                unique: true,
             },
         },
         {
-            tableName: "genres",
+            tableName: "authors",
             timestamps: true,
         }
     );
 
-    Genre.associate = (models) => {
-        Genre.belongsToMany(models.Comic, {
-            through: "genre_comic",
-            foreignKey: "genreId",
-            otherKey: "comicId",
+    Author.associate = (models) => {
+        Author.belongsToMany(models.Comic, {
+            through: "author_comic",
+            foreignKey: "author_id",
+            otherKey: "comic_id",
             as: "comics",
         });
     };
 
-    return Genre;
+    return Author;
 };

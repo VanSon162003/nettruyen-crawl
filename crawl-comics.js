@@ -5,9 +5,11 @@ const { Comic } = require("./models");
 const downloadImage = require("./utils/downloadImage");
 const getRandomUserAgent = require("./utils/getRandomUserAgent");
 
-let page = 3;
+let page = 1;
 
 function start() {
+    if (page === 50) return;
+
     nightmare
         .useragent(getRandomUserAgent())
         .goto(`https://nettruyenvia.com/tim-truyen?page=${page}`)
@@ -49,6 +51,7 @@ function start() {
                     ...comic,
                     thumbnail: thumbPath,
                 };
+
                 if (existComic) {
                     await existComic.update(data);
                 } else {
