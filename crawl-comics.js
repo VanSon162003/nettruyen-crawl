@@ -1,32 +1,20 @@
-const puppeteer = require("puppeteer");
+const Nightmare = require("nightmare");
+const nightmare = Nightmare({ show: false });
 const { Comic } = require("./models");
 
 const downloadImage = require("./utils/downloadImage");
 const getRandomUserAgent = require("./utils/getRandomUserAgent");
 
-let pageNumber = 1;
-let browser;
-let page;
+let page = 1;
 
-async function start() {
-    if (pageNumber === 50) {
-        await browser.close();
-        return;
-    }
+function start() {
+    if (page === 50) return;
 
-    try {
-        await page.setUserAgent(getRandomUserAgent());
-        await page.goto(
-            `https://nettruyenvia.com/tim-truyen?page=${pageNumber}`,
-            {
-                waitUntil: "domcontentloaded",
-                timeout: 0,
-            }
-        );
-
-        await page.waitForSelector(".items .item");
-
-        const comics = await page.evaluate(() => {
+    nightmare
+        .useragent(getRandomUserAgent())
+        .goto(`https://nettruyenvia.com/tim-truyen?page=${page}`)
+        .wait(".items .item")
+        .evaluate(() => {
             return [...document.querySelectorAll(".items .item")].map(
                 (item) => {
                     const slugs = item
@@ -42,44 +30,42 @@ async function start() {
                     };
                 }
             );
-        });
+        })
+        // .end()
+        .then(async (comics) => {
+            for (let comic of comics) {
+                const thumbPath = `/uploads/thumbnails/${comic.thumbnail
+                    .split("/")
+                    .at(-1)}`;
 
-        for (let comic of comics) {
-            const thumbPath = `/uploads/thumbnails/${comic.thumbnail
-                .split("/")
-                .at(-1)}`;
+                await downloadImage(
+                    comic.thumbnail,
+                    `.${thumbPath}`,
+                    "https://nettruyenvia.com/"
+                );
 
-            await downloadImage(
-                comic.thumbnail,
-                `.${thumbPath}`,
-                "https://nettruyenvia.com/"
-            );
+                const existComic = await Comic.findOne({
+                    where: { slug: comic.slug },
+                });
+                const data = {
+                    ...comic,
+                    thumbnail: thumbPath,
+                };
 
-            const existComic = await Comic.findOne({
-                where: { slug: comic.slug },
-            });
-
-            const data = {
-                ...comic,
-                thumbnail: thumbPath,
-            };
-
-            if (existComic) {
-                await existComic.update(data);
-            } else {
-                await Comic.create(data);
+                if (existComic) {
+                    await existComic.update(data);
+                } else {
+                    await Comic.create(data);
+                }
             }
-        }
-    } catch (error) {
-        console.error("Search failed:", error);
-    } finally {
-        pageNumber++;
-        await start();
-    }
+        })
+        .catch((error) => {
+            console.error("Search failed:", error);
+        })
+        .finally(() => {
+            page++;
+            start();
+        });
 }
 
-(async () => {
-    browser = await puppeteer.launch({ headless: true });
-    page = await browser.newPage();
-    await start();
-})();
+start();
