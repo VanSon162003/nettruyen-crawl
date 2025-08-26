@@ -1,41 +1,42 @@
-const Nightmare = require("nightmare");
-const nightmare = Nightmare({ show: false });
-
+const puppeteer = require("puppeteer");
 const { Comic, Chapter } = require("./models");
 const getRandomUserAgent = require("./utils/getRandomUserAgent");
-const { where } = require("sequelize");
 
-async function scrapeComic(item) {
+async function scrapeComic(item, browser) {
+    let page;
     try {
-        const data = await nightmare
-            .useragent(getRandomUserAgent())
-            .goto(item.originalUrl)
-            .wait("body")
-            .evaluate(() => {
-                const chapters = [
-                    ...document.querySelectorAll(
-                        "#chapter_list .row .chapter "
-                    ),
-                ].map((item) => item.querySelector("a").href);
+        page = await browser.newPage();
+        await page.setUserAgent(getRandomUserAgent());
 
-                const slugs = chapters.map((item) => item.split("/").pop());
+        await page.goto(item.originalUrl, { waitUntil: "domcontentloaded" });
 
-                return { chapters, slugs };
-            });
+        const data = await page.evaluate(() => {
+            const chapters = [
+                ...document.querySelectorAll("#chapter_list .row .chapter a"),
+            ].map((el) => el.href);
+
+            const slugs = chapters.map((url) => url.split("/").pop());
+
+            return { chapters, slugs };
+        });
 
         return data;
     } catch (error) {
         console.error(error);
         return null;
+    } finally {
+        if (page) await page.close();
     }
 }
 
 async function start() {
+    const browser = await puppeteer.launch({ headless: true });
     const comics = await Comic.findAll();
 
     for (const item of comics) {
         try {
-            const data = await scrapeComic(item);
+            const data = await scrapeComic(item, browser);
+            if (!data) continue;
 
             for (let i = 0; i < data.chapters.length; ++i) {
                 await Chapter.create({
@@ -49,6 +50,8 @@ async function start() {
             console.log(error);
         }
     }
+
+    await browser.close();
 }
 
 start();

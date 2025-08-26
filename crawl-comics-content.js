@@ -1,28 +1,36 @@
-const Nightmare = require("nightmare");
-const nightmare = Nightmare({ show: false });
-
+const puppeteer = require("puppeteer");
 const { Comic } = require("./models");
 const getRandomUserAgent = require("./utils/getRandomUserAgent");
-const { where } = require("sequelize");
 
 async function scrapeComic(item) {
+    let browser;
     try {
-        const data = await nightmare
-            .useragent(getRandomUserAgent())
-            .goto(item.originalUrl)
-            .wait("body")
+        browser = await puppeteer.launch({ headless: true }); // headless để không hiện browser
+        const page = await browser.newPage();
 
-            .evaluate(() => {
-                const content = document.querySelector(
-                    ".detail-content > h2 + div > h2 ~ div + div + div"
-                ).innerText;
+        // random user-agent
+        await page.setUserAgent(getRandomUserAgent());
 
-                return content;
-            });
-        return data;
+        // load trang
+        await page.goto(item.originalUrl, {
+            waitUntil: "domcontentloaded",
+            timeout: 60000,
+        });
+
+        // lấy nội dung
+        const content = await page.evaluate(() => {
+            const el = document.querySelector(
+                ".detail-content > h2 + div > h2 ~ div + div + div"
+            );
+            return el ? el.innerText.trim() : null;
+        });
+
+        return content;
     } catch (error) {
-        console.error(error);
+        console.error(`❌ Error scraping ${item.originalUrl}:`, error);
         return null;
+    } finally {
+        if (browser) await browser.close();
     }
 }
 
@@ -31,8 +39,13 @@ async function start() {
 
     for (const item of comics) {
         const content = await scrapeComic(item);
-        item.content = content;
-        await item.save();
+        if (content) {
+            item.content = content;
+            await item.save();
+            console.log(`✅ Saved comic ${item.id}`);
+        } else {
+            console.log(`⚠️ Không lấy được content cho comic ${item.id}`);
+        }
     }
 }
 
