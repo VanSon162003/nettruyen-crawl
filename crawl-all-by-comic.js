@@ -24,9 +24,10 @@ async function scrapeComic(item) {
             const genres =
                 document.querySelector(".kind > .name + p").innerText;
 
-            const views = document.querySelector(
-                ".list-info li:last-child p:last-child"
-            ).innerText;
+            const views =
+                document.querySelector(
+                    ".list-info li:nth-child(4) p:last-child"
+                )?.innerText || 0;
 
             const ratings = document.querySelector(
                 'span[itemprop="ratingValue"]'
