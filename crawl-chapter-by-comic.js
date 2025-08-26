@@ -30,7 +30,11 @@ async function scrapeComic(item, browser) {
 }
 
 async function start() {
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
     const comics = await Comic.findAll();
 
     for (const item of comics) {
@@ -39,12 +43,22 @@ async function start() {
             if (!data) continue;
 
             for (let i = 0; i < data.chapters.length; ++i) {
-                await Chapter.create({
-                    comic_id: item.id,
-                    name: data.slugs[i],
-                    slug: data.slugs[i],
-                    originalUrl: data.chapters[i],
+                // Kiểm tra xem chapter đã tồn tại chưa để tránh duplicate
+                const existingChapter = await Chapter.findOne({
+                    where: {
+                        comic_id: item.id,
+                        slug: data.slugs[i],
+                    },
                 });
+
+                if (!existingChapter) {
+                    await Chapter.create({
+                        comic_id: item.id,
+                        name: data.slugs[i],
+                        slug: data.slugs[i],
+                        originalUrl: data.chapters[i],
+                    });
+                }
             }
         } catch (error) {
             console.log(error);
