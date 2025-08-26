@@ -1,24 +1,15 @@
-require("dotenv").config({ path: "/custom/path/.env", debug: true }); // Load .env một lần duy nhất
-
 const Nightmare = require("nightmare");
 const { Comic } = require("./models");
+
 const downloadImage = require("./utils/downloadImage");
 const getRandomUserAgent = require("./utils/getRandomUserAgent");
 
 let page = 1;
 
 async function start() {
-    if (page >= 50) {
-        console.log("Hoàn thành crawl tại page", page);
-        return;
-    }
+    const nightmare = Nightmare({ show: false });
 
-    const nightmare = Nightmare({ show: false }); // Tạo instance mới mỗi lần lặp
     try {
-        console.log(`Đang crawl trang ${page}`);
-        // Thêm độ trễ để tránh bị chặn
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
         const comics = await nightmare
             .useragent(getRandomUserAgent())
             .goto(`https://nettruyenvia.com/tim-truyen?page=${page}`)
@@ -42,7 +33,7 @@ async function start() {
             });
 
         for (let comic of comics) {
-            const thumbPath = `/Uploads/thumbnails/${comic.thumbnail
+            const thumbPath = `/uploads/thumbnails/${comic.thumbnail
                 .split("/")
                 .at(-1)}`;
 
@@ -55,10 +46,7 @@ async function start() {
             const existComic = await Comic.findOne({
                 where: { slug: comic.slug },
             });
-            const data = {
-                ...comic,
-                thumbnail: thumbPath,
-            };
+            const data = { ...comic, thumbnail: thumbPath };
 
             if (existComic) {
                 await existComic.update(data);
@@ -66,18 +54,13 @@ async function start() {
                 await Comic.create(data);
             }
         }
-    } catch (error) {
-        console.error(`Lỗi khi crawl trang ${page}:`, error);
+    } catch (err) {
+        console.error("Search failed:", err);
     } finally {
-        await nightmare.end(); // Đóng instance Nightmare
-        if (page < 50) {
-            page++;
-            await start(); // Chờ start hoàn thành
-        }
+        await nightmare.end(); // 💡 giải phóng instance
+        page++;
+        setTimeout(start, 5000); // đợi 5s rồi mới crawl tiếp (tránh spam)
     }
 }
 
-start().catch((error) => {
-    console.error("Lỗi khởi động:", error);
-    process.exit(1); // Thoát tiến trình nếu lỗi nghiêm trọng
-});
+start();
