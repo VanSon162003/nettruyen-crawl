@@ -1,5 +1,5 @@
 const fs = require("fs");
-
+require("dotenv").config();
 module.exports = {
     development: {
         username: "root",
