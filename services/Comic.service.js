@@ -51,7 +51,8 @@ class ComicService {
             include: includeClause,
             limit: parseInt(limit),
             offset,
-            order: [["createdAt", "DESC"]],
+            order: [["createdAt", "ASC"]],
+
             distinct: true,
         });
 
